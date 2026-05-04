@@ -1,5 +1,7 @@
 import itertools as iter
 
+
+
 class Movimiento :
     def __init__(self,id,nombre,tipo,monto,fecha,estado="Activo",aceptaParcial = None,frecuencia = 0,penalizacionFija=False,porc_penalizacion = 0):
         self.id = id
@@ -17,6 +19,25 @@ class Movimiento :
         cadena = f"id: {self.id} Nombre: {self.nombre} {self.tipo}-${self.monto} (Fecha: {self.fecha})"
         return cadena
     
+
+
+def busquedaBinaria(indice:int,lista:list[Movimiento]):
+    ini = 0
+    final = len(lista)
+    res = -1
+    while(ini <= final):
+        mid = int((ini+final)/2)
+        #print(mid)
+        if(indice>lista[mid].id):
+            ini = mid+1
+        elif(indice<lista[mid].id):
+            final = mid-1
+        else:
+            res = mid
+            break
+            
+    
+    return res
 class Usuario:
     def __init__(self,balance = 0, nombre = "",supervivencia=0):
         self.balance = balance
@@ -47,10 +68,9 @@ class SimulacionSemanal :
             
             
         else:
-            for movimiento in self.movimientos:
-                if(movimiento.id==id):
-                    self.movimientos.remove(movimiento)
-                    break
+            indice = busquedaBinaria(id,self.movimientos)
+            if indice != -1:
+                self.movimientos.pop(indice)
 
 
     def correrSimulacion(self,user:Usuario):
@@ -78,7 +98,7 @@ class SimulacionSemanal :
                 deudas.append(movimiento)
         #aqui ya filtramos para quedarnos con los activos y descartar los que ya no me importan, tambien filtramos solo los obligatorios
         #Modificando
-
+    
 
 
 

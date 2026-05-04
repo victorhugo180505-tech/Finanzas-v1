@@ -15,14 +15,15 @@ for movimiento in simulacion1.movimientos:
     print(movimiento)
 
 simulacion1.eliminarMovimiento(nombre="DeudaPrueba")
-print("\n\n\n")
+print("\n\n")
 for movimiento in simulacion1.movimientos:
     print(movimiento)
 
 userTester = l.Usuario(nombre = "krazy",balance=128)
-
-print(userTester.balance)
-simulacion1.correrSimulacion(userTester)
+print("krazy")
+print(l.busquedaBinaria(2,arreglo))
+#print(userTester.balance)
+#simulacion1.correrSimulacion(userTester)
 #userTester.balance = 
 #userTester.balance-=100
-print(userTester.balance)
+#print(userTester.balance)
