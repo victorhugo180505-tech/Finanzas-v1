@@ -1,9 +1,9 @@
 import itertools as iter
-
-
+import archivos as f
+import datetime as dt
 
 class Movimiento :
-    def __init__(self,id,nombre,tipo,monto,fecha,estado="Activo",aceptaParcial = None,frecuencia = 0,penalizacionFija=False,porc_penalizacion = 0):
+    def __init__(self,id,nombre,tipo,monto,fecha:str,estado="activo",aceptaParcial = False,frecuencia = 0,penalizacionFija=False,porc_penalizacion = 0):
         self.id = id
         self.nombre = nombre
         self.tipo = tipo
@@ -11,6 +11,7 @@ class Movimiento :
         self.monto = monto
         self.aceptaParcial = aceptaParcial
         self.fecha = fecha
+        
         self.frecuencia = frecuencia
         self.porc_penalizacion = porc_penalizacion
         self.penalizacionFija = penalizacionFija
@@ -20,103 +21,100 @@ class Movimiento :
         return cadena
     
 
+def penalizacion(movimiento):
+    if movimiento["penalizacionFija"] == False:
+        return movimiento["porc_penalizacion"] * movimiento["monto"] / 100
+    else:
+        return movimiento["porc_penalizacion"]
 
-def busquedaBinaria(indice:int,lista:list[Movimiento]):
-    ini = 0
-    final = len(lista)
-    res = -1
-    while(ini <= final):
-        mid = int((ini+final)/2)
-        #print(mid)
-        if(indice>lista[mid].id):
-            ini = mid+1
-        elif(indice<lista[mid].id):
-            final = mid-1
-        else:
-            res = mid
-            break
-            
-    
-    return res
 class Usuario:
-    def __init__(self,balance = 0, nombre = "",supervivencia=0):
+    def __init__(self,balance = 0,supervivencia=0):
         self.balance = balance
-        self.nombre = nombre
         self.supervivencia= supervivencia
 
 
 
 
-class SimulacionSemanal :
+"""class SimulacionSemanal :
     def __init__(self,movimientosIniciales = None):
         
         self.movimientos = []    
         
         for movimiento in movimientosIniciales:
-            self.movimientos.append(movimiento)
+            self.movimientos.append(movimiento)"""
 
-    def agregarMovimiento(self,movement:Movimiento):
-        self.movimientos.append(movement)
+
+
+def correrSimulacion(user:Usuario,lista_movimientos:list[dict],fecha_inicial:str):
+    """
+    Realiza cambios en el balance del usuario en base a los movimientos almacenados,
+    retorna una lista con pares listos para ser graficados y los movimientos que no se alcanzaron a cubrir.
+    """
+    movimientos_activos = []
+    for movimiento in lista_movimientos:
+        if movimiento["estado"]=="activo":
+            movimientos_activos.append(movimiento)
+    fecha_inicio = dt.datetime.strptime(fecha_inicial,"%Y-%m-%d")
+    fecha_actual = fecha_inicio
+    #fecha_inicial = fecha_inicial - dt.timedelta(days=1)
+    graficacion = []
+    deudas = []
+    while(len(movimientos_activos) > 0):
+        fecha_limite = fecha_inicio + dt.timedelta(days=14)
+
+        while(fecha_actual != fecha_limite):
+            
+            for movimiento in movimientos_activos.copy():
+
+                if fecha_actual== dt.datetime.strptime(movimiento["fecha"],"%Y-%m-%d"):
+
+                    if movimiento["tipo"]=="ingreso":
+                        user.balance+=movimiento["monto"]
+                    
+                    elif movimiento["tipo"]=="gasto":
+                        user.balance-=movimiento["monto"]
+                    
+                    else:
+                        deudas.append(movimiento)
+                    movimientos_activos.remove(movimiento)
+                                    
+                
+            graficacion.append([ fecha_actual,user.balance])
+            fecha_actual = fecha_actual + dt.timedelta(days=1)
+        fecha_inicio = fecha_limite
+        #Aqui ya tengo los saldos considerando solamente los gastos e ingresos. Los cuales son obligatorios aunque se llegue a negativo.
+    deudas_ordenadas = sorted(deudas,key=lambda x: (-penalizacion(x),x["fecha"]))
     
-
-    def eliminarMovimiento(self,id = -1, nombre = ""):
-        if id == -1:
-            for movimiento in self.movimientos:
-                if(movimiento.nombre==nombre):
-                    self.movimientos.remove(movimiento)
-                    break
+    fecha_inicio = dt.datetime.strptime(fecha_inicial,"%Y-%m-%d")
+    fecha_actual = fecha_inicio
+    indice = -1
+    for elemento in graficacion:
+        indice+=1
+        for deuda in deudas_ordenadas.copy():
             
-            
-        else:
-            indice = busquedaBinaria(id,self.movimientos)
-            if indice != -1:
-                self.movimientos.pop(indice)
-
-
-    def correrSimulacion(self,user:Usuario):
-        """
-        Realiza cambios en el balance del usuario en base a los movimientos almacenados,
-        retorna una lista con los movimientos que no se alcanzaron a cubrir.
-        """
-        #egresos = []
-        eventos = []
-        deudas = []
-        for movimiento in self.movimientos:
-
-
-            """if movimiento.estado == "Activo":
-                eventos.append(movimiento)
-                if movimiento.tipo == "Ingreso":
-                    user.balance+=movimiento.monto
-                elif movimiento.tipo == "Deuda":
-                    egresos.append(movimiento)
-                else:
-                    user.balance-=movimiento.monto"""
-            if movimiento.estado == "Activo" and (movimiento.tipo == "Ingreso" or movimiento.tipo == "Gasto"):
-                eventos.append(movimiento)
+            punto_mas_bajo = min(graficacion[indice:indice+14],key=lambda x: x[1])[1]
+            limite = 0
+            if indice+14 >= len(graficacion):
+                limite = len(graficacion)-1
             else:
-                deudas.append(movimiento)
-        #aqui ya filtramos para quedarnos con los activos y descartar los que ya no me importan, tambien filtramos solo los obligatorios
-        #Modificando
-    
-
-
-
-
-
+                limite = indice+14
+            if punto_mas_bajo - deuda["monto"] >= user.supervivencia and graficacion[limite][0] >= dt.datetime.strptime(deuda["fecha"],"%Y-%m-%d"):
+                for dia_futuro in graficacion[indice:]:
+                    dia_futuro[1] -= deuda["monto"]
+                deudas_ordenadas.remove(deuda)
+            else:
+                if dt.datetime.strptime(deuda["fecha"],"%Y-%m-%d") == elemento[0]:
+                    modificador_indice = deudas_ordenadas.index(deuda)
+                    deudas_ordenadas[modificador_indice]["fecha"] = dt.datetime.strftime(dt.datetime.strptime(deuda["fecha"],"%Y-%m-%d") + dt.timedelta(days=30),"%Y-%m-%d")
+                    deudas_ordenadas[modificador_indice]["monto"] += penalizacion(deudas_ordenadas[modificador_indice])
+                    deudas_ordenadas = sorted(deudas_ordenadas,key=lambda x: (-penalizacion(x),x["fecha"]))
+                
+      
+    return graficacion,deudas_ordenadas
         
 
+    #punto_mas_bajo = min(graficacion[i:],key=lambda x: x[1])[1]
+    # if punto_mas_bajo - deuda["monto"] >= user.supervivencia:
 
 
-
-       
-        #return balance
-            
-
-            
-
-
-
-    
-        
-    
+ 

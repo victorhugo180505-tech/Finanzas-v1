@@ -1,8 +1,8 @@
 import flet as ft
 import flet_charts as ftc
 
-import logica as lg  # Descomenta cuando tengas estos módulos
-import archivos as f
+# import logica as lg  # Descomenta cuando tengas estos módulos
+# import archivos as f
 
 
 def main(page: ft.Page):
@@ -28,7 +28,7 @@ def main(page: ft.Page):
         ],
     )
     fecha_input = ft.TextField(label="Date (YYYY-MM-DD)")
-    
+    input_ruta_db = ft.TextField(label="DB Path", value=ruta_archivo_db, width=400)
 
     # ==========================================
     # 1. LÓGICA AUXILIAR
@@ -36,20 +36,20 @@ def main(page: ft.Page):
     def refrescar_tabla():
         nonlocal movimientos_registrados
 
-        movimientos_registrados = f.obtenerMovimientos()  # Lógica real
-        
+        # movimientos_registrados = f.obtenerMovimientos()  # Lógica real
+        movimientos_registrados = [
+            {"id": 1, "nombre": "Sueldo", "tipo": "ingreso", "monto": 500, "fecha": "2026-05-08", "estado": "activo", "porc_penalizacion": 0},
+            {"id": 2, "nombre": "Renta", "tipo": "gasto", "monto": 300, "fecha": "2026-05-10", "estado": "activo", "porc_penalizacion": 0},
+        ]
 
         tabla_movimientos.rows.clear()
         for mov in movimientos_registrados:
             tabla_movimientos.rows.append(crear_fila_movimiento(mov))
-        
+
         page.update()
-        calcular_y_dibujar_grafica()
-        
-        
 
     def eliminar_mov(id_mov):
-        f.eliminarMovimiento(id_mov)
+        # f.eliminarMovimiento(id_mov)
         refrescar_tabla()
 
     def cerrar_dialogo():
@@ -89,26 +89,9 @@ def main(page: ft.Page):
     )
 
     def guardar_nuevo_movimiento(e):
-        nuevo_id = f.encontrarProximoId()
-
-        # Instanciamos usando tu clase de logica.py
-        nuevo_mov = lg.Movimiento(
-            id=nuevo_id,
-            nombre=nombre_input.value,
-            tipo=tipo_input.value,
-            monto=float(monto_input.value),
-            fecha=fecha_input.value
-        )
-
-        f.insertarMovimiento(nuevo_mov) # Guardamos en BD
-
-        # Limpiamos los campos para la próxima vez
-        nombre_input.value = ""
-        monto_input.value = ""
-        fecha_input.value = ""
-
-        page.pop_dialog() # Cerramos el diálogo
-        refrescar_tabla() # Actualizamos la tabla visualmente
+        # lg.Movimiento(...)  / f.insertarMovimiento(...)
+        page.pop_dialog()
+        refrescar_tabla()
 
     dlg_add_mov = ft.AlertDialog(
         title=ft.Text("Add Movement"),
@@ -151,24 +134,23 @@ def main(page: ft.Page):
         expand=True,
     )
 
-    
+    refrescar_tabla()
 
     # ==========================================
     # 3. PESTAÑA PROYECCIÓN (TAB 2)
     # ==========================================
-    import datetime as dt
-
-    # ESTADOS DE LA PROYECCIÓN
-    fecha_base_proyeccion = dt.date.today() # Empezamos hoy
-    rango_vista_dias = 7 # Por defecto semanal
-    
-    texto_rango_fechas = ft.Text(weight=ft.FontWeight.BOLD)
-    texto_deudas_pendientes = ft.Text("No pending pushed deudas", color=ft.Colors.GREEN_300)
+    chart_data = [
+        ftc.LineChartDataPoint(0, 1000),
+        ftc.LineChartDataPoint(2, 1000),
+        ftc.LineChartDataPoint(4, 1500),
+        ftc.LineChartDataPoint(6, 1200),
+        ftc.LineChartDataPoint(10, 1200),
+    ]
 
     grafica_proyeccion = ftc.LineChart(
         data_series=[
             ftc.LineChartData(
-                points=[], 
+                points=chart_data,
                 stroke_width=4,
                 curved=True,
                 color=ft.Colors.CYAN,
@@ -181,120 +163,14 @@ def main(page: ft.Page):
         expand=True,
     )
 
-    def calcular_y_dibujar_grafica():
-        # 1. Obtenemos datos de la BD
-        usuario_actual = f.obtenerUsuario()
-        movimientos = f.obtenerMovimientos()
-        
-        if len(movimientos) == 0:
-            grafica_proyeccion.data_series[0].points = []
-            texto_rango_fechas.value = "No data"
-            page.update()
-            return
-
-        # 2. Corremos la simulación COMPLETA desde el inicio de los tiempos (o una fecha base)
-        # Buscamos la fecha del movimiento más antiguo para que la simulación procese todo
-        fechas_movimientos = [dt.datetime.strptime(m["fecha"], "%Y-%m-%d").date() for m in movimientos]
-        fecha_simulacion_inicio = min(fechas_movimientos).strftime("%Y-%m-%d") if fechas_movimientos else fecha_base_proyeccion.strftime("%Y-%m-%d")
-
-        try:
-            # Tu lógica pura, sin modificaciones de UI
-            datos_grafica_completos, deudas_pendientes = lg.correrSimulacion(usuario_actual, movimientos, fecha_simulacion_inicio)
-            
-            # 3. FILTRAMOS PARA LA VISTA (Tu idea implementada)
-            fecha_fin = fecha_base_proyeccion + dt.timedelta(days=rango_vista_dias)
-            texto_rango_fechas.value = f"{fecha_base_proyeccion.strftime('%Y-%m-%d')} to {fecha_fin.strftime('%Y-%m-%d')}"
-            
-            # ... (tu código anterior dentro del try) ...
-            nuevos_puntos = []
-            x_index = 0 # Flet necesita un eje X numérico continuo
-            
-            for dato in datos_grafica_completos:
-                fecha_punto = dato[0].date() # dato[0] es un datetime en tu lógica
-                
-                # Solo agregamos a la gráfica si la fecha cae dentro de nuestra "rebanada" visual
-                if fecha_base_proyeccion <= fecha_punto <= fecha_fin:
-                    nuevos_puntos.append(ftc.LineChartDataPoint(x_index, dato[1]))
-                    x_index += 1
-                    
-            # -----------------------------------------------------
-            # CORRECCIÓN AQUÍ: Recreamos el objeto Data entero 
-            # para que Flet se vea forzado a dibujar la línea
-            # -----------------------------------------------------
-            grafica_proyeccion.data_series = [
-                ftc.LineChartData(
-                    points=nuevos_puntos, 
-                    stroke_width=4,
-                    curved=True,
-                    color=ft.Colors.CYAN,
-                )
-            ]
-            
-            # Actualizamos texto de deudas
-            if deudas_pendientes:
-                texto_deudas_pendientes.value = f"Pending: {deudas_pendientes[0]['nombre']} for {deudas_pendientes[0]['fecha']}"
-                texto_deudas_pendientes.color = ft.Colors.RED_300
-            else:
-                texto_deudas_pendientes.value = "All clear!"
-                texto_deudas_pendientes.color = ft.Colors.GREEN_300
-
-        except Exception as e:
-            print(f"Error al graficar: {e}")
-
-        page.update()
-
-    # CALLBACKS PARA LOS BOTONES
-    # CALLBACKS PARA LOS BOTONES
-    def cambiar_rango(e):
-        nonlocal rango_vista_dias
-        
-        # Corrección: verificamos si hay algo seleccionado y usamos 'in'
-        if selector_rango.selected:
-            if "Weekly" in selector_rango.selected: rango_vista_dias = 7
-            elif "Monthly" in selector_rango.selected: rango_vista_dias = 30
-            elif "Annual" in selector_rango.selected: rango_vista_dias = 365
-            
-        calcular_y_dibujar_grafica()
-
-    def mover_tiempo_atras(e):
-        nonlocal fecha_base_proyeccion
-        fecha_base_proyeccion -= dt.timedelta(days=rango_vista_dias)
-        calcular_y_dibujar_grafica()
-
-    def mover_tiempo_adelante(e):
-        nonlocal fecha_base_proyeccion
-        fecha_base_proyeccion += dt.timedelta(days=rango_vista_dias)
-        calcular_y_dibujar_grafica()
-
-    # CONTROLES VISUALES
-    selector_rango = ft.SegmentedButton(
-        on_change=cambiar_rango,
-        allow_empty_selection= True,
-        segments=[
-            ft.Segment(value="Annual", label=ft.Text("Annual")),
-            ft.Segment(value="Monthly", label=ft.Text("Monthly")),
-            ft.Segment(value="Weekly", label=ft.Text("Weekly")),
-        ]
-    )
-
-    fila_navegacion = ft.Row(
-        alignment=ft.MainAxisAlignment.CENTER,
-        controls=[
-            ft.IconButton(icon=ft.Icons.ARROW_LEFT, on_click=mover_tiempo_atras),
-            texto_rango_fechas,
-            ft.IconButton(icon=ft.Icons.ARROW_RIGHT, on_click=mover_tiempo_adelante),
-        ]
-    )
-
     vista_proyeccion = ft.Container(
         content=ft.Column(
             [
                 ft.Text("Cash Flow Projection", size=20, weight=ft.FontWeight.BOLD),
-                ft.Row([selector_rango], alignment=ft.MainAxisAlignment.CENTER),
-                fila_navegacion,
-                ft.Container(content=grafica_proyeccion, height=300, padding=10),
+                ft.Row([ft.Text("< 2026-05-06 to 2026-05-19 >")]),
+                ft.Container(content=grafica_proyeccion, height=300, padding=20),
                 ft.Text("Pushed Deudas (Not Paid):", weight=ft.FontWeight.BOLD),
-                texto_deudas_pendientes,
+                ft.Text("Pending: 1320.0 for 2026-06-06", color=ft.Colors.RED_300),
             ]
         ),
         padding=20,
@@ -398,8 +274,40 @@ def main(page: ft.Page):
         ),
     )
 
-    
-    refrescar_tabla()
+    # ==========================================
+    # 6. MODAL DE BIENVENIDA
+    # ==========================================
+    def continuar_session(e):
+        print(f"Opening DB: {input_ruta_db.value}")
+        page.pop_dialog()
+        refrescar_tabla()
+
+    dlg_welcome = ft.AlertDialog(
+        title=ft.Text("Welcome to Financial Proyector!"),
+        content=ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text("Confirm or replace the route below:"),
+                    input_ruta_db,
+                    ft.Text("(Optional)", italic=True, size=12),
+                ],
+                height=200,
+                width=460,
+                tight=True,
+            )
+        ),
+        actions=[
+            ft.Button(
+                content=ft.Row(                        # FIX: content= recibe Control, no string
+                    [ft.Icon(ft.Icons.PLAY_ARROW_ROUNDED), ft.Text("Continue")],
+                    tight=True,
+                ),
+                on_click=continuar_session,
+            )
+        ],
+        modal=True,
+    )
+
     # FIX: pasar la instancia main_tabs, no la clase ft.Tabs
     page.add(main_tabs)
     

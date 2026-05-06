@@ -1,29 +1,26 @@
 import logica as l
 
-prueba =  l.Movimiento(id=1,nombre="IngresoPrueba",tipo="Ingreso",estado="Activo",monto=550,fecha="2026/04/16",aceptaParcial=None,frecuencia=0,porc_penalizacion=0)
-prueba2 =  l.Movimiento(id=2,nombre="GastoPrueba",tipo="Gasto",estado="Activo",monto=500,fecha="2026/04/17",aceptaParcial=False,frecuencia=0,porc_penalizacion=0)
-#print(prueba2)
-arreglo = []
-arreglo.append(prueba)
-arreglo.append(prueba2)
-simulacion1 = l.SimulacionSemanal(arreglo)
+# --- ESCENARIO DE PRUEBA ---
 
-prueba3 =  l.Movimiento(id=3,nombre="DeudaPrueba",tipo="Deuda",estado="Activo",monto=50,fecha="2026/04/17",aceptaParcial=True,frecuencia=0,porc_penalizacion=20)
-simulacion1.agregarMovimiento(prueba3)
+# 1. Usuario con 1000 pesos y quiere conservar al menos 200 siempre
+profe_user = l.Usuario(balance=1000, supervivencia=200)
 
-for movimiento in simulacion1.movimientos:
-    print(movimiento)
+# 2. Movimientos (simulando TinyDB)
+datos_prueba = [
+    {"id": 1, "tipo": "ingreso", "monto": 500, "fecha": "2026-05-08", "estado": "activo"}, 
+    {"id": 2, "tipo": "gasto", "monto": 300, "fecha": "2026-05-10", "estado": "activo"},   
+    {"id": 3, "tipo": "deuda", "monto": 1200, "fecha": "2026-05-07", "estado": "activo", 
+     "penalizacionFija": False, "porc_penalizacion": 10} 
+]
 
-simulacion1.eliminarMovimiento(nombre="DeudaPrueba")
-print("\n\n")
-for movimiento in simulacion1.movimientos:
-    print(movimiento)
+# 3. Ejecutar
+historial, pendientes = l.correrSimulacion(profe_user, datos_prueba, "2026-05-06")
 
-userTester = l.Usuario(nombre = "krazy",balance=128)
-print("krazy")
-print(l.busquedaBinaria(2,arreglo))
-#print(userTester.balance)
-#simulacion1.correrSimulacion(userTester)
-#userTester.balance = 
-#userTester.balance-=100
-#print(userTester.balance)
+# 4. Ver resultados
+print("--- HISTORIAL DE SALDOS ---")
+for dia in historial:
+    print(f"Fecha: {dia[0].strftime('%Y-%m-%d')} | Saldo: ${dia[1]}")
+
+print("\n--- DEUDAS QUE NO SE PUDIERON PAGAR ---")
+for d in pendientes:
+    print(f"Pendiente: {d['monto']} para la fecha {d['fecha']}")
